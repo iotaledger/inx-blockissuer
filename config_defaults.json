@@ -28,6 +28,15 @@
     "maxConnectionAttempts": 30,
     "targetNetworkName": ""
   },
+  "blockIssuer": {
+    "accountAddress": "",
+    "accountSeed": ""
+  },
+  "restAPI": {
+    "bindAddress": "localhost:9086",
+    "advertiseAddress": "",
+    "debugRequestLoggerEnabled": false
+  },
   "profiling": {
     "enabled": false,
     "bindAddress": "localhost:6060"

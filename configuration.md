@@ -18,7 +18,7 @@ keywords:
 
 INX-BlockIssuer uses a JSON standard format as a config file. If you are unsure about JSON syntax, you can find more information in the [official JSON specs](https://www.json.org).
 
-You can change the path of the config file by using the `-c` or `--config` argument while executing `inx-indexer` executable.
+You can change the path of the config file by using the `-c` or `--config` argument while executing `inx-blockissuer` executable.
 
 For example:
 ```bash
@@ -129,7 +129,45 @@ Example:
   }
 ```
 
-## <a id="profiling"></a> 4. Profiling
+## <a id="blockissuer"></a> 4. BlockIssuer
+
+| Name           | Description                                                                              | Type   | Default value |
+| -------------- | ---------------------------------------------------------------------------------------- | ------ | ------------- |
+| accountAddress | The address of the account that is used to issue the blocks                              | string | ""            |
+| accountSeed    | The seed of the account that is used to generate the public keypair used to issue blocks | string | ""            |
+
+Example:
+
+```json
+  {
+    "blockIssuer": {
+      "accountAddress": "",
+      "accountSeed": ""
+    }
+  }
+```
+
+## <a id="restapi"></a> 5. RestAPI
+
+| Name                      | Description                                                                             | Type    | Default value    |
+| ------------------------- | --------------------------------------------------------------------------------------- | ------- | ---------------- |
+| bindAddress               | The bind address on which the Indexer HTTP server listens                               | string  | "localhost:9086" |
+| advertiseAddress          | The address of the Indexer HTTP server which is advertised to the INX Server (optional) | string  | ""               |
+| debugRequestLoggerEnabled | Whether the debug logging for requests should be enabled                                | boolean | false            |
+
+Example:
+
+```json
+  {
+    "restAPI": {
+      "bindAddress": "localhost:9086",
+      "advertiseAddress": "",
+      "debugRequestLoggerEnabled": false
+    }
+  }
+```
+
+## <a id="profiling"></a> 6. Profiling
 
 | Name        | Description                                       | Type    | Default value    |
 | ----------- | ------------------------------------------------- | ------- | ---------------- |
