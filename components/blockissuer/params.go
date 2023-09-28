@@ -19,12 +19,12 @@ type ParametersRestAPI struct {
 	DebugRequestLoggerEnabled bool `default:"false" usage:"whether the debug logging for requests should be enabled"`
 }
 
-var ParamBlockIssuer = &ParametersBlockIssuer{}
+var ParamsBlockIssuer = &ParametersBlockIssuer{}
 var ParamsRestAPI = &ParametersRestAPI{}
 
 var params = &app.ComponentParams{
 	Params: map[string]any{
-		"blockIssuer": ParamBlockIssuer,
+		"blockIssuer": ParamsBlockIssuer,
 		"restAPI":     ParamsRestAPI,
 	},
 	Masked: nil,

@@ -2,6 +2,7 @@ package blockissuer
 
 import (
 	"context"
+	"crypto/ed25519"
 	"errors"
 	"net/http"
 	"strings"
@@ -12,9 +13,12 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/app/shutdown"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/inx-app/pkg/nodebridge"
 	"github.com/iotaledger/inx-blockissuer/pkg/daemon"
+	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/hexutil"
 )
 
 const APIRoute = "/api/v1/blockissuer"
@@ -32,6 +36,8 @@ func init() {
 type dependencies struct {
 	dig.In
 	NodeBridge      *nodebridge.NodeBridge
+	AccountAddress  *iotago.AccountAddress
+	PrivateKey      ed25519.PrivateKey
 	ShutdownHandler *shutdown.ShutdownHandler
 	Echo            *echo.Echo
 }
@@ -42,6 +48,42 @@ var (
 )
 
 func provide(c *dig.Container) error {
+	type depsIn struct {
+		dig.In
+		NodeBridge *nodebridge.NodeBridge
+	}
+
+	if err := c.Provide(func(deps depsIn) (*iotago.AccountAddress, error) {
+		hrp, addr, err := iotago.ParseBech32(ParamsBlockIssuer.AccountAddress)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "invalid bech32 address: %s", ParamsBlockIssuer.AccountAddress)
+		}
+
+		if deps.NodeBridge.APIProvider().CurrentAPI().ProtocolParameters().Bech32HRP() != hrp {
+			return nil, ierrors.Wrapf(err, "invalid bech32 address prefix: %s", hrp)
+		}
+
+		accountAddr, ok := addr.(*iotago.AccountAddress)
+		if !ok {
+			return nil, ierrors.Errorf("invalid bech32 address, not an account: %s", ParamsBlockIssuer.AccountAddress)
+		}
+
+		return accountAddr, nil
+	}); err != nil {
+		return err
+	}
+
+	if err := c.Provide(func() (ed25519.PrivateKey, error) {
+		seed, err := hexutil.DecodeHex(ParamsBlockIssuer.AccountSeed)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "invalid seed: %s", ParamsBlockIssuer.AccountSeed)
+		}
+
+		return ed25519.NewKeyFromSeed(seed), nil
+	}); err != nil {
+		return err
+	}
+
 	return c.Provide(func() *echo.Echo {
 		return httpserver.NewEcho(
 			Component.Logger(),
@@ -55,6 +97,8 @@ func run() error {
 	// create a background worker that handles the API
 	if err := Component.Daemon().BackgroundWorker("API", func(ctx context.Context) {
 		Component.LogInfo("Starting API server ...")
+
+		registerRoutes()
 
 		go func() {
 			Component.LogInfof("You can now access the API using: http://%s", ParamsRestAPI.BindAddress)
