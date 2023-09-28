@@ -1,11 +1,13 @@
-module github.com/iotaledger/inx-blockissuer
+module github.com/iotaledger/inx-mqtt/tools/gendoc
 
 go 1.21
 
+replace github.com/iotaledger/inx-blockissuer => ../../
+
 require (
 	github.com/iotaledger/hive.go/app v0.0.0-20230912172434-dc477e1f5140
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230927140518-622f63be6182
-
+	github.com/iotaledger/hive.go/apputils v0.0.0-20230706083020-ef6c3248369d
+	github.com/iotaledger/inx-blockissuer v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -17,6 +19,7 @@ require (
 	github.com/eclipse/paho.mqtt.golang v1.4.3 // indirect
 	github.com/ethereum/go-ethereum v1.13.1 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
+	github.com/fbiville/markdown-table-formatter v0.3.0 // indirect
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
@@ -39,6 +42,7 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230921132212-c286a9bd46ea // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230926122307-d671b36a4a65 // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230921132212-c286a9bd46ea // indirect
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230927140518-622f63be6182 // indirect
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230927140257-bfa0bb0af2bd // indirect
 	github.com/iotaledger/iota.go/v4 v4.0.0-20230927125610-ddf51789ec4d // indirect
 	github.com/knadh/koanf v1.5.0 // indirect
