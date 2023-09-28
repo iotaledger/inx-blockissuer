@@ -85,6 +85,12 @@ func sendPayload(c echo.Context) error {
 
 	// Construct Block
 	blockBuilder := builder.NewBasicBlockBuilder(deps.NodeBridge.APIProvider().CurrentAPI())
+	latestCommitment, err := deps.NodeBridge.LatestCommitment()
+	if err != nil {
+		return ierrors.Wrapf(echo.ErrInternalServerError, "failed to get latest commitment: %w", err)
+	}
+	blockBuilder.SlotCommitmentID(latestCommitment.MustID())
+	blockBuilder.LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitmentID().Slot())
 	blockBuilder.StrongParents(strong)
 	blockBuilder.WeakParents(weak)
 	blockBuilder.ShallowLikeParents(shallowLike)

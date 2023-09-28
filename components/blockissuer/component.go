@@ -81,7 +81,7 @@ func provide(c *dig.Container) error {
 		if ParamsBlockIssuer.AccountSeed == "" {
 			return nil, ierrors.Errorf("empty seed in config")
 		}
-		
+
 		seed, err := hexutil.DecodeHex(ParamsBlockIssuer.AccountSeed)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "invalid seed: %s", ParamsBlockIssuer.AccountSeed)
