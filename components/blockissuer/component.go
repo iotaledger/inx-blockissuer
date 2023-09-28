@@ -54,6 +54,10 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func(deps depsIn) (*iotago.AccountAddress, error) {
+		if ParamsBlockIssuer.AccountAddress == "" {
+			return nil, ierrors.Errorf("empty bech32 in config")
+		}
+
 		hrp, addr, err := iotago.ParseBech32(ParamsBlockIssuer.AccountAddress)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "invalid bech32 address: %s", ParamsBlockIssuer.AccountAddress)
@@ -74,6 +78,10 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func() (ed25519.PrivateKey, error) {
+		if ParamsBlockIssuer.AccountSeed == "" {
+			return nil, ierrors.Errorf("empty seed in config")
+		}
+		
 		seed, err := hexutil.DecodeHex(ParamsBlockIssuer.AccountSeed)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "invalid seed: %s", ParamsBlockIssuer.AccountSeed)
