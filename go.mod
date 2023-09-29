@@ -6,7 +6,7 @@ require (
 	github.com/iotaledger/hive.go/app v0.0.0-20230912172434-dc477e1f5140
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20230925074643-a89732593ca8
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230927140518-622f63be6182
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230928172229-07b12c5f34a5
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230929074901-a2fa34aa5a35
 	github.com/labstack/echo/v4 v4.11.1
 	go.uber.org/dig v1.17.0
 

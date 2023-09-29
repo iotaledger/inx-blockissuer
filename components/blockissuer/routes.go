@@ -58,15 +58,15 @@ func sendPayload(c echo.Context) error {
 		return echo.ErrUnsupportedMediaType
 	}
 
-	// Check for a transaction
-	transaction, ok := iotaPayload.(*iotago.Transaction)
+	// Check for a signed transaction
+	signedTx, ok := iotaPayload.(*iotago.SignedTransaction)
 	if !ok {
 		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, only transactions are supported")
 	}
 
 	// Check if the transaction is allotting mana to the issuer
 	var allotedMana iotago.Mana
-	for _, allotment := range transaction.Essence.Allotments {
+	for _, allotment := range signedTx.Transaction.Allotments {
 		if allotment.AccountID == deps.AccountAddress.AccountID() {
 			allotedMana = allotment.Value
 			break
@@ -94,8 +94,8 @@ func sendPayload(c echo.Context) error {
 	blockBuilder.StrongParents(strong)
 	blockBuilder.WeakParents(weak)
 	blockBuilder.ShallowLikeParents(shallowLike)
-	blockBuilder.Payload(transaction)
-	blockBuilder.BurnedMana(allotedMana)
+	blockBuilder.Payload(signedTx)
+	blockBuilder.MaxBurnedMana(allotedMana)
 	blockBuilder.Sign(deps.AccountAddress.AccountID(), deps.PrivateKey)
 	iotaBlock, err := blockBuilder.Build()
 	if err != nil {
