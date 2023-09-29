@@ -1,16 +1,27 @@
 package blockissuer
 
 import (
+	"encoding/binary"
+	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
+	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
+	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+)
+
+const (
+	ProofOfWorkNonceHeader = "X-IOTA-PoW-Nonce"
 )
 
 func registerRoutes() {
@@ -20,11 +31,40 @@ func registerRoutes() {
 
 func getInfo(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
-		"issuer": ParamsBlockIssuer.AccountAddress,
+		"blockIssuerAddress": ParamsBlockIssuer.AccountAddress,
+		"proofOfWorkScore":   fmt.Sprintf("%d", ParamsBlockIssuer.ProofOfWorkScore),
 	})
 }
 
+func proofOfWorkScore(powDigest []byte, nonce uint64) uint8 {
+	nonceData := make([]byte, serializer.UInt64ByteSize)
+	binary.LittleEndian.PutUint64(nonceData, nonce)
+	hash := blake2b.Sum256(byteutils.ConcatBytes(powDigest, nonceData))
+
+	var trailingZerosCount uint8
+	for i := len(hash) - 1; i >= 0 && hash[i] == 0; i-- {
+		trailingZerosCount++
+	}
+	return trailingZerosCount
+}
+
 func sendPayload(c echo.Context) error {
+	var nonceValue uint64
+	requiresProofOfWork := ParamsBlockIssuer.ProofOfWorkScore > 0
+
+	if requiresProofOfWork {
+		powNonce := c.Request().Header.Get(ProofOfWorkNonceHeader)
+		if powNonce == "" {
+			return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, proof of work nonce missing in the header %s", ProofOfWorkNonceHeader)
+		}
+
+		var err error
+		nonceValue, err = strconv.ParseUint(powNonce, 10, 64)
+		if err != nil {
+			return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, invalid proof of work nonce value. error: %w", err)
+		}
+	}
+
 	mimeType, err := httpserver.GetRequestContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV2, echo.MIMEApplicationJSON)
 	if err != nil {
 		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
@@ -43,19 +83,37 @@ func sendPayload(c echo.Context) error {
 	}
 
 	// Check if we got a JSON payload or a binary payload
+	var payloadBytes []byte
 	switch mimeType {
 	case echo.MIMEApplicationJSON:
-		if err := deps.NodeBridge.APIProvider().CurrentAPI().JSONDecode(bytes, iotaPayload); err != nil {
+		if err := deps.NodeBridge.APIProvider().CurrentAPI().JSONDecode(bytes, iotaPayload, serix.WithValidation()); err != nil {
 			return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
+		}
+
+		if requiresProofOfWork {
+			// Serialize the payload so that we can verify the PoW
+			payloadBytes, err = deps.NodeBridge.APIProvider().CurrentAPI().Encode(iotaPayload)
+			if err != nil {
+				return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
+			}
 		}
 
 	case httpserver.MIMEApplicationVendorIOTASerializerV2:
-		if _, err := deps.NodeBridge.APIProvider().CurrentAPI().Decode(bytes, iotaPayload); err != nil {
+		if _, err := deps.NodeBridge.APIProvider().CurrentAPI().Decode(bytes, iotaPayload, serix.WithValidation()); err != nil {
 			return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
 		}
+		// No need to encode the payload again, we already have the bytes
+		payloadBytes = bytes
 
 	default:
 		return echo.ErrUnsupportedMediaType
+	}
+
+	// Check for correct PoW
+	if requiresProofOfWork {
+		if trailingZerosCount := proofOfWorkScore(payloadBytes, nonceValue); trailingZerosCount < ParamsBlockIssuer.ProofOfWorkScore {
+			return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, proof of work failed, required %d trailing zeros, got %d", ParamsBlockIssuer.ProofOfWorkScore, trailingZerosCount)
+		}
 	}
 
 	// Check for a signed transaction

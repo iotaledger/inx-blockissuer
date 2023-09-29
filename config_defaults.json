@@ -30,7 +30,8 @@
   },
   "blockIssuer": {
     "accountAddress": "",
-    "accountSeed": ""
+    "accountSeed": "",
+    "proofOfWorkScore": 8
   },
   "restAPI": {
     "bindAddress": "localhost:9086",
