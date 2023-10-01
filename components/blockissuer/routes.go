@@ -15,6 +15,7 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
+	inx "github.com/iotaledger/inx/go"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
@@ -131,8 +132,21 @@ func sendPayload(c echo.Context) error {
 		}
 	}
 
+	// Check if the transaction is allotting mana to the issuer
 	if allotedMana == 0 {
 		return ierrors.Wrap(httpserver.ErrInvalidParameter, "invalid payload, transaction is not allotting any mana")
+	}
+
+	// Validate Payload to see if the transaction as constructed would be accepted
+	wrappedPayload, err := inx.WrapPayload(signedTx, signedTx.API)
+	if err != nil {
+		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to wrap payload: %w", err)
+	}
+
+	if response, err := deps.NodeBridge.Client().ValidatePayload(c.Request().Context(), wrappedPayload); err != nil {
+		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to execute Stardust VM: %w", err)
+	} else if !response.GetIsValid() {
+		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to execute Stardust VM: %s", response.GetError())
 	}
 
 	// Request tips
