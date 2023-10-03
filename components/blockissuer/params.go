@@ -3,9 +3,12 @@ package blockissuer
 import "github.com/iotaledger/hive.go/app"
 
 type ParametersBlockIssuer struct {
-	AccountAddress   string `default:"" usage:"the address of the account that is used to issue the blocks"`
-	AccountSeed      string `default:"" usage:"the seed of the account that is used to generate the public keypair used to issue blocks"`
-	ProofOfWorkScore uint8  `default:"8" usage:"the number of trailing zeroes required for the proof of work to be valid. Set to 0 to disable proof of work"`
+	AccountAddress string `default:"" usage:"the address of the account that is used to issue the blocks"`
+	AccountSeed    string `default:"" usage:"the seed of the account that is used to generate the public keypair used to issue blocks"`
+
+	ProofOfWork struct {
+		TargetTrailingZeros int `default:"25" usage:"the number of trailing zeroes required for the proof of work to be valid. Set to 0 to disable proof of work"`
+	}
 }
 
 // ParametersRestAPI contains the definition of the parameters used by the BlockIssuer HTTP server.

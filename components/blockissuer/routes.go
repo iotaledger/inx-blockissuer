@@ -1,22 +1,19 @@
 package blockissuer
 
 import (
-	"encoding/binary"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
-	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/serializer/v2"
-	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	inx "github.com/iotaledger/inx/go"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/blockissuer/pow"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
@@ -32,26 +29,23 @@ func registerRoutes() {
 
 func getInfo(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
-		"blockIssuerAddress": ParamsBlockIssuer.AccountAddress,
-		"proofOfWorkScore":   fmt.Sprintf("%d", ParamsBlockIssuer.ProofOfWorkScore),
+		"blockIssuerAddress":     ParamsBlockIssuer.AccountAddress,
+		"powTargetTrailingZeros": fmt.Sprintf("%d", ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros),
 	})
 }
 
-func proofOfWorkScore(powDigest []byte, nonce uint64) uint8 {
-	nonceData := make([]byte, serializer.UInt64ByteSize)
-	binary.LittleEndian.PutUint64(nonceData, nonce)
-	hash := blake2b.Sum256(byteutils.ConcatBytes(powDigest, nonceData))
+func proofOfWorkScore(data []byte, nonce uint64) int {
+	// compute the digest
+	h := pow.Hash.New()
+	h.Write(data)
+	powDigest := h.Sum(nil)
 
-	var trailingZerosCount uint8
-	for i := len(hash) - 1; i >= 0 && hash[i] == 0; i-- {
-		trailingZerosCount++
-	}
-	return trailingZerosCount
+	return pow.TrailingZeros(powDigest[:], nonce)
 }
 
 func sendPayload(c echo.Context) error {
 	var nonceValue uint64
-	requiresProofOfWork := ParamsBlockIssuer.ProofOfWorkScore > 0
+	requiresProofOfWork := ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros > 0
 
 	if requiresProofOfWork {
 		powNonce := c.Request().Header.Get(ProofOfWorkNonceHeader)
@@ -112,8 +106,8 @@ func sendPayload(c echo.Context) error {
 
 	// Check for correct PoW
 	if requiresProofOfWork {
-		if trailingZerosCount := proofOfWorkScore(payloadBytes, nonceValue); trailingZerosCount < ParamsBlockIssuer.ProofOfWorkScore {
-			return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, proof of work failed, required %d trailing zeros, got %d", ParamsBlockIssuer.ProofOfWorkScore, trailingZerosCount)
+		if trailingZerosCount := proofOfWorkScore(payloadBytes, nonceValue); trailingZerosCount < ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros {
+			return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, proof of work failed, required %d trailing zeros, got %d", ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros, trailingZerosCount)
 		}
 	}
 
