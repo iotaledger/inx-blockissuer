@@ -21,7 +21,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/hexutil"
 )
 
-const APIRoute = "/api/v1/blockissuer"
+const APIRoute = "/api/blockissuer/v1"
 
 func init() {
 	Component = &app.Component{
