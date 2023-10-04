@@ -31,7 +31,9 @@
   "blockIssuer": {
     "accountAddress": "",
     "accountSeed": "",
-    "proofOfWorkScore": 8
+    "proofOfWork": {
+      "targetTrailingZeros": 25
+    }
   },
   "restAPI": {
     "bindAddress": "localhost:9086",
