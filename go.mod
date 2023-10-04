@@ -8,7 +8,7 @@ require (
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230929122509-67f34bfed40d
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231001095511-32be422a567e
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231001095356-923e8f138951
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231003154311-26aa2f0fd388
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231004090046-91d32e8d62b8
 	github.com/labstack/echo/v4 v4.11.1
 	go.uber.org/dig v1.17.0
 

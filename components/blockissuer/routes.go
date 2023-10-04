@@ -1,7 +1,6 @@
 package blockissuer
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -29,13 +28,13 @@ func registerRoutes() {
 }
 
 func getInfo(c echo.Context) error {
-	return c.JSON(http.StatusOK, map[string]string{
-		"blockIssuerAddress":     ParamsBlockIssuer.AccountAddress,
-		"powTargetTrailingZeros": fmt.Sprintf("%d", ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros),
+	return c.JSON(http.StatusOK, &BlockIssuerInfo{
+		BlockIssuerAddress:     ParamsBlockIssuer.AccountAddress,
+		PowTargetTrailingZeros: ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros,
 	})
 }
 
-func proofOfWorkScore(data []byte, nonce uint64) int {
+func proofOfWorkTrailingZeroes(data []byte, nonce uint64) int {
 	// compute the digest
 	h := pow.Hash.New()
 	h.Write(data)
@@ -53,7 +52,7 @@ func getRequestPoWNonce(c echo.Context) (uint64, error) {
 	var err error
 	nonceValue, err := strconv.ParseUint(powNonce, 10, 64)
 	if err != nil {
-		return 0, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, invalid proof of work nonce value. error: %w", err)
+		return 0, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, invalid proof of work nonce value in the header %s, error: %w", HeaderBlockIssuerProofOfWorkNonce, err)
 	}
 
 	return nonceValue, nil
@@ -67,7 +66,7 @@ func getRequestCommitmentID(c echo.Context) (iotago.CommitmentID, error) {
 
 	commitmentID, err := iotago.SlotIdentifierFromHexString(commitmentIDHex)
 	if err != nil {
-		return iotago.EmptyCommitmentID, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, invalid proof of work nonce value. error: %w", err)
+		return iotago.EmptyCommitmentID, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, invalid commitment ID value in the header %s, error: %w", HeaderBlockIssuerCommitmentID, err)
 	}
 
 	return commitmentID, nil
@@ -116,7 +115,7 @@ func getPayload(c echo.Context, requiresProofOfWork bool) (iotago.BlockPayload, 
 		payloadBytes = bytes
 
 	default:
-		return nil, nil, echo.ErrUnsupportedMediaType
+		return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", echo.ErrUnsupportedMediaType)
 	}
 
 	return iotaPayload, payloadBytes, nil
@@ -126,7 +125,7 @@ func getAllotedMana(signedTx *iotago.SignedTransaction) (iotago.Mana, error) {
 	// Check if the transaction is allotting mana to the issuer
 	var allotedMana iotago.Mana
 	for _, allotment := range signedTx.Transaction.Allotments {
-		if allotment.AccountID == deps.AccountAddress.AccountID() {
+		if allotment.AccountID.Matches(deps.AccountAddress.AccountID()) {
 			allotedMana = allotment.Value
 			break
 		}
@@ -134,7 +133,7 @@ func getAllotedMana(signedTx *iotago.SignedTransaction) (iotago.Mana, error) {
 
 	// Check if the transaction is allotting mana to the issuer
 	if allotedMana == 0 {
-		return 0, ierrors.Wrap(httpserver.ErrInvalidParameter, "invalid payload, transaction is not allotting any mana")
+		return 0, ierrors.Wrap(httpserver.ErrInvalidParameter, "invalid payload, transaction is not allotting any mana to the block issuer account")
 	}
 
 	return allotedMana, nil
@@ -148,9 +147,9 @@ func validatePayload(c echo.Context, signedTx *iotago.SignedTransaction) error {
 	}
 
 	if response, err := deps.NodeBridge.Client().ValidatePayload(c.Request().Context(), wrappedPayload); err != nil {
-		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to execute Stardust VM: %w", err)
+		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to execute VM: %w", err)
 	} else if !response.GetIsValid() {
-		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to execute Stardust VM: %s", response.GetError())
+		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to execute VM: %s", response.GetError())
 	}
 
 	return nil
@@ -188,6 +187,7 @@ func constructBlock(c echo.Context, signedTx *iotago.SignedTransaction, allotedM
 }
 
 func sendPayload(c echo.Context) error {
+	// get the commitment ID from the request
 	commitmentID, err := getRequestCommitmentID(c)
 	if err != nil {
 		return err
@@ -197,53 +197,59 @@ func sendPayload(c echo.Context) error {
 
 	var nonceValue uint64
 	if requiresProofOfWork {
+		// get the PoW nonce from the request
 		nonceValue, err = getRequestPoWNonce(c)
 		if err != nil {
 			return err
 		}
 	}
 
+	// get the payload from the request
 	iotaPayload, payloadBytes, err := getPayload(c, requiresProofOfWork)
 	if err != nil {
 		return err
 	}
 
-	// Check for correct PoW
+	// check for correct PoW
 	if requiresProofOfWork {
-		if trailingZerosCount := proofOfWorkScore(payloadBytes, nonceValue); trailingZerosCount < ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros {
+		if trailingZerosCount := proofOfWorkTrailingZeroes(payloadBytes, nonceValue); trailingZerosCount < ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros {
 			return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, proof of work failed, required %d trailing zeros, got %d", ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros, trailingZerosCount)
 		}
 	}
 
-	// Check for a signed transaction
+	// check for a signed transaction
 	signedTx, ok := iotaPayload.(*iotago.SignedTransaction)
 	if !ok {
-		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, only transactions are supported")
+		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, only signed transactions are supported")
 	}
 
+	// get the mana that was alloted to the block issuer
 	allotedMana, err := getAllotedMana(signedTx)
 	if err != nil {
 		return err
 	}
 
+	// validate the payload
 	if err := validatePayload(c, signedTx); err != nil {
 		return err
 	}
 
+	// construct the block and sign it
 	iotaBlock, err := constructBlock(c, signedTx, allotedMana, commitmentID)
 	if err != nil {
 		return err
 	}
 
-	// Submit Block
+	// submit Block to the node
 	blockID, err := deps.NodeBridge.SubmitBlock(c.Request().Context(), iotaBlock)
 	if err != nil {
 		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to attach block: %w", err)
 	}
 
+	// encode the response
 	jsonResult, err := deps.NodeBridge.APIProvider().CurrentAPI().JSONEncode(&apimodels.BlockCreatedResponse{BlockID: blockID})
 	if err != nil {
-		return err
+		return ierrors.Wrapf(echo.ErrInternalServerError, "failed to encode the response: %w", err)
 	}
 
 	return c.JSONBlob(http.StatusOK, jsonResult)
