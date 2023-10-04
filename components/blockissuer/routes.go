@@ -44,7 +44,7 @@ func proofOfWorkScore(data []byte, nonce uint64) int {
 	return pow.TrailingZeros(powDigest[:], nonce)
 }
 
-func getPoWNonce(c echo.Context) (uint64, error) {
+func getRequestPoWNonce(c echo.Context) (uint64, error) {
 	powNonce := c.Request().Header.Get(HeaderBlockIssuerProofOfWorkNonce)
 	if powNonce == "" {
 		return 0, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, proof of work nonce missing in the header %s", HeaderBlockIssuerProofOfWorkNonce)
@@ -57,6 +57,20 @@ func getPoWNonce(c echo.Context) (uint64, error) {
 	}
 
 	return nonceValue, nil
+}
+
+func getRequestCommitmentID(c echo.Context) (iotago.CommitmentID, error) {
+	commitmentIDHex := c.Request().Header.Get(HeaderBlockIssuerCommitmentID)
+	if commitmentIDHex == "" {
+		return iotago.EmptyCommitmentID, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, commitment ID is missing in the header %s", HeaderBlockIssuerCommitmentID)
+	}
+
+	commitmentID, err := iotago.SlotIdentifierFromHexString(commitmentIDHex)
+	if err != nil {
+		return iotago.EmptyCommitmentID, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, invalid proof of work nonce value. error: %w", err)
+	}
+
+	return commitmentID, nil
 }
 
 func getPayload(c echo.Context, requiresProofOfWork bool) (iotago.BlockPayload, []byte, error) {
@@ -142,7 +156,7 @@ func validatePayload(c echo.Context, signedTx *iotago.SignedTransaction) error {
 	return nil
 }
 
-func constructBlock(c echo.Context, signedTx *iotago.SignedTransaction, allotedMana iotago.Mana) (*iotago.ProtocolBlock, error) {
+func constructBlock(c echo.Context, signedTx *iotago.SignedTransaction, allotedMana iotago.Mana, commitmentID iotago.CommitmentID) (*iotago.ProtocolBlock, error) {
 	// Request tips
 	strong, weak, shallowLike, err := deps.NodeBridge.RequestTips(c.Request().Context(), iotago.BlockMaxParents)
 	if err != nil {
@@ -151,17 +165,17 @@ func constructBlock(c echo.Context, signedTx *iotago.SignedTransaction, allotedM
 
 	// Construct Block
 	blockBuilder := builder.NewBasicBlockBuilder(deps.NodeBridge.APIProvider().CurrentAPI())
-	latestCommitment, err := deps.NodeBridge.LatestCommitment()
-	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get latest commitment: %w", err)
-	}
 
-	blockBuilder.SlotCommitmentID(latestCommitment.MustID())
+	// we need to set the commitmentID to the one the payload signer used, otherwise the RMC could be different,
+	// and therefore the allotment could be wrong, which causes the block to fail.
+	blockBuilder.SlotCommitmentID(commitmentID)
 	blockBuilder.LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitmentID().Slot())
 	blockBuilder.StrongParents(strong)
 	blockBuilder.WeakParents(weak)
 	blockBuilder.ShallowLikeParents(shallowLike)
 	blockBuilder.Payload(signedTx)
+	// set the max burned mana to the mana that was alloted to the block issuer.
+	// if the value would be too low, the block would be filtered by the node of the block issuer.
 	blockBuilder.MaxBurnedMana(allotedMana)
 	blockBuilder.Sign(deps.AccountAddress.AccountID(), deps.PrivateKey)
 
@@ -174,13 +188,16 @@ func constructBlock(c echo.Context, signedTx *iotago.SignedTransaction, allotedM
 }
 
 func sendPayload(c echo.Context) error {
+	commitmentID, err := getRequestCommitmentID(c)
+	if err != nil {
+		return err
+	}
+
 	requiresProofOfWork := ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros > 0
 
 	var nonceValue uint64
-	var err error
-
 	if requiresProofOfWork {
-		nonceValue, err = getPoWNonce(c)
+		nonceValue, err = getRequestPoWNonce(c)
 		if err != nil {
 			return err
 		}
@@ -213,7 +230,7 @@ func sendPayload(c echo.Context) error {
 		return err
 	}
 
-	iotaBlock, err := constructBlock(c, signedTx, allotedMana)
+	iotaBlock, err := constructBlock(c, signedTx, allotedMana, commitmentID)
 	if err != nil {
 		return err
 	}
