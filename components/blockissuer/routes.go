@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	ProofOfWorkNonceHeader = "X-IOTA-PoW-Nonce"
+	HeaderBlockIssuerProofOfWorkNonce = "X-IOTA-BlockIssuer-PoW-Nonce"
+	HeaderBlockIssuerCommitmentID     = "X-IOTA-BlockIssuer-Commitment-ID"
 )
 
 func registerRoutes() {
@@ -43,38 +44,38 @@ func proofOfWorkScore(data []byte, nonce uint64) int {
 	return pow.TrailingZeros(powDigest[:], nonce)
 }
 
-func sendPayload(c echo.Context) error {
-	var nonceValue uint64
-	requiresProofOfWork := ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros > 0
-
-	if requiresProofOfWork {
-		powNonce := c.Request().Header.Get(ProofOfWorkNonceHeader)
-		if powNonce == "" {
-			return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, proof of work nonce missing in the header %s", ProofOfWorkNonceHeader)
-		}
-
-		var err error
-		nonceValue, err = strconv.ParseUint(powNonce, 10, 64)
-		if err != nil {
-			return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, invalid proof of work nonce value. error: %w", err)
-		}
+func getPoWNonce(c echo.Context) (uint64, error) {
+	powNonce := c.Request().Header.Get(HeaderBlockIssuerProofOfWorkNonce)
+	if powNonce == "" {
+		return 0, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, proof of work nonce missing in the header %s", HeaderBlockIssuerProofOfWorkNonce)
 	}
+
+	var err error
+	nonceValue, err := strconv.ParseUint(powNonce, 10, 64)
+	if err != nil {
+		return 0, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, invalid proof of work nonce value. error: %w", err)
+	}
+
+	return nonceValue, nil
+}
+
+func getPayload(c echo.Context, requiresProofOfWork bool) (iotago.BlockPayload, []byte, error) {
 
 	mimeType, err := httpserver.GetRequestContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV2, echo.MIMEApplicationJSON)
 	if err != nil {
-		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
+		return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
 	}
 
 	var iotaPayload iotago.Payload
 
 	if c.Request().Body == nil {
 		// bad request
-		return ierrors.Wrap(httpserver.ErrInvalidParameter, "invalid payload, error: request body missing")
+		return nil, nil, ierrors.Wrap(httpserver.ErrInvalidParameter, "invalid payload, error: request body missing")
 	}
 
 	bytes, err := io.ReadAll(c.Request().Body)
 	if err != nil {
-		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
+		return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
 	}
 
 	// Check if we got a JSON payload or a binary payload
@@ -82,26 +83,112 @@ func sendPayload(c echo.Context) error {
 	switch mimeType {
 	case echo.MIMEApplicationJSON:
 		if err := deps.NodeBridge.APIProvider().CurrentAPI().JSONDecode(bytes, iotaPayload, serix.WithValidation()); err != nil {
-			return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
+			return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
 		}
 
 		if requiresProofOfWork {
 			// Serialize the payload so that we can verify the PoW
 			payloadBytes, err = deps.NodeBridge.APIProvider().CurrentAPI().Encode(iotaPayload)
 			if err != nil {
-				return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
+				return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
 			}
 		}
 
 	case httpserver.MIMEApplicationVendorIOTASerializerV2:
 		if _, err := deps.NodeBridge.APIProvider().CurrentAPI().Decode(bytes, iotaPayload, serix.WithValidation()); err != nil {
-			return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
+			return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
 		}
 		// No need to encode the payload again, we already have the bytes
 		payloadBytes = bytes
 
 	default:
-		return echo.ErrUnsupportedMediaType
+		return nil, nil, echo.ErrUnsupportedMediaType
+	}
+
+	return iotaPayload, payloadBytes, nil
+}
+
+func getAllotedMana(signedTx *iotago.SignedTransaction) (iotago.Mana, error) {
+	// Check if the transaction is allotting mana to the issuer
+	var allotedMana iotago.Mana
+	for _, allotment := range signedTx.Transaction.Allotments {
+		if allotment.AccountID == deps.AccountAddress.AccountID() {
+			allotedMana = allotment.Value
+			break
+		}
+	}
+
+	// Check if the transaction is allotting mana to the issuer
+	if allotedMana == 0 {
+		return 0, ierrors.Wrap(httpserver.ErrInvalidParameter, "invalid payload, transaction is not allotting any mana")
+	}
+
+	return allotedMana, nil
+}
+
+// validatePayload validates the payload via INX to see if the transaction as constructed would be accepted.
+func validatePayload(c echo.Context, signedTx *iotago.SignedTransaction) error {
+	wrappedPayload, err := inx.WrapPayload(signedTx, signedTx.API)
+	if err != nil {
+		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to wrap payload: %w", err)
+	}
+
+	if response, err := deps.NodeBridge.Client().ValidatePayload(c.Request().Context(), wrappedPayload); err != nil {
+		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to execute Stardust VM: %w", err)
+	} else if !response.GetIsValid() {
+		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to execute Stardust VM: %s", response.GetError())
+	}
+
+	return nil
+}
+
+func constructBlock(c echo.Context, signedTx *iotago.SignedTransaction, allotedMana iotago.Mana) (*iotago.ProtocolBlock, error) {
+	// Request tips
+	strong, weak, shallowLike, err := deps.NodeBridge.RequestTips(c.Request().Context(), iotago.BlockMaxParents)
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to request tips: %w", err)
+	}
+
+	// Construct Block
+	blockBuilder := builder.NewBasicBlockBuilder(deps.NodeBridge.APIProvider().CurrentAPI())
+	latestCommitment, err := deps.NodeBridge.LatestCommitment()
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get latest commitment: %w", err)
+	}
+
+	blockBuilder.SlotCommitmentID(latestCommitment.MustID())
+	blockBuilder.LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitmentID().Slot())
+	blockBuilder.StrongParents(strong)
+	blockBuilder.WeakParents(weak)
+	blockBuilder.ShallowLikeParents(shallowLike)
+	blockBuilder.Payload(signedTx)
+	blockBuilder.MaxBurnedMana(allotedMana)
+	blockBuilder.Sign(deps.AccountAddress.AccountID(), deps.PrivateKey)
+
+	iotaBlock, err := blockBuilder.Build()
+	if err != nil {
+		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to build block: %w", err)
+	}
+
+	return iotaBlock, nil
+}
+
+func sendPayload(c echo.Context) error {
+	requiresProofOfWork := ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros > 0
+
+	var nonceValue uint64
+	var err error
+
+	if requiresProofOfWork {
+		nonceValue, err = getPoWNonce(c)
+		if err != nil {
+			return err
+		}
+	}
+
+	iotaPayload, payloadBytes, err := getPayload(c, requiresProofOfWork)
+	if err != nil {
+		return err
 	}
 
 	// Check for correct PoW
@@ -117,55 +204,18 @@ func sendPayload(c echo.Context) error {
 		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, only transactions are supported")
 	}
 
-	// Check if the transaction is allotting mana to the issuer
-	var allotedMana iotago.Mana
-	for _, allotment := range signedTx.Transaction.Allotments {
-		if allotment.AccountID == deps.AccountAddress.AccountID() {
-			allotedMana = allotment.Value
-			break
-		}
-	}
-
-	// Check if the transaction is allotting mana to the issuer
-	if allotedMana == 0 {
-		return ierrors.Wrap(httpserver.ErrInvalidParameter, "invalid payload, transaction is not allotting any mana")
-	}
-
-	// Validate Payload to see if the transaction as constructed would be accepted
-	wrappedPayload, err := inx.WrapPayload(signedTx, signedTx.API)
+	allotedMana, err := getAllotedMana(signedTx)
 	if err != nil {
-		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to wrap payload: %w", err)
+		return err
 	}
 
-	if response, err := deps.NodeBridge.Client().ValidatePayload(c.Request().Context(), wrappedPayload); err != nil {
-		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to execute Stardust VM: %w", err)
-	} else if !response.GetIsValid() {
-		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to execute Stardust VM: %s", response.GetError())
+	if err := validatePayload(c, signedTx); err != nil {
+		return err
 	}
 
-	// Request tips
-	strong, weak, shallowLike, err := deps.NodeBridge.RequestTips(c.Request().Context(), iotago.BlockMaxParents)
+	iotaBlock, err := constructBlock(c, signedTx, allotedMana)
 	if err != nil {
-		return ierrors.Wrapf(echo.ErrInternalServerError, "failed to request tips: %w", err)
-	}
-
-	// Construct Block
-	blockBuilder := builder.NewBasicBlockBuilder(deps.NodeBridge.APIProvider().CurrentAPI())
-	latestCommitment, err := deps.NodeBridge.LatestCommitment()
-	if err != nil {
-		return ierrors.Wrapf(echo.ErrInternalServerError, "failed to get latest commitment: %w", err)
-	}
-	blockBuilder.SlotCommitmentID(latestCommitment.MustID())
-	blockBuilder.LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitmentID().Slot())
-	blockBuilder.StrongParents(strong)
-	blockBuilder.WeakParents(weak)
-	blockBuilder.ShallowLikeParents(shallowLike)
-	blockBuilder.Payload(signedTx)
-	blockBuilder.MaxBurnedMana(allotedMana)
-	blockBuilder.Sign(deps.AccountAddress.AccountID(), deps.PrivateKey)
-	iotaBlock, err := blockBuilder.Build()
-	if err != nil {
-		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to build block: %w", err)
+		return err
 	}
 
 	// Submit Block
