@@ -220,7 +220,7 @@ func sendPayload(c echo.Context) error {
 	// check for a signed transaction
 	signedTx, ok := iotaPayload.(*iotago.SignedTransaction)
 	if !ok {
-		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, only signed transactions are supported")
+		return ierrors.Wrap(httpserver.ErrInvalidParameter, "invalid payload, only signed transactions are supported")
 	}
 
 	// get the mana that was alloted to the block issuer
