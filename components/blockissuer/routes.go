@@ -212,7 +212,7 @@ func sendPayload(c echo.Context) error {
 
 	// check for correct PoW
 	if requiresProofOfWork {
-		if trailingZerosCount := proofOfWorkTrailingZeroes(payloadBytes, nonceValue); trailingZerosCount < ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros {
+		if trailingZerosCount := proofOfWorkTrailingZeroes(payloadBytes, nonceValue); uint8(trailingZerosCount) < ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros {
 			return ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, proof of work failed, required %d trailing zeros, got %d", ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros, trailingZerosCount)
 		}
 	}

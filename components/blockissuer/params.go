@@ -7,7 +7,7 @@ type ParametersBlockIssuer struct {
 	AccountSeed    string `default:"" usage:"the seed of the account that is used to generate the public keypair used to issue blocks"`
 
 	ProofOfWork struct {
-		TargetTrailingZeros int `default:"25" usage:"the number of trailing zeroes required for the proof of work to be valid. Set to 0 to disable proof of work"`
+		TargetTrailingZeros uint8 `default:"25" usage:"the number of trailing zeroes required for the proof of work to be valid. Set to 0 to disable proof of work"`
 	}
 }
 
