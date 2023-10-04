@@ -131,11 +131,17 @@ Example:
 
 ## <a id="blockissuer"></a> 4. BlockIssuer
 
-| Name             | Description                                                                                                 | Type   | Default value |
-| ---------------- | ----------------------------------------------------------------------------------------------------------- | ------ | ------------- |
-| accountAddress   | The address of the account that is used to issue the blocks                                                 | string | ""            |
-| accountSeed      | The seed of the account that is used to generate the public keypair used to issue blocks                    | string | ""            |
-| proofOfWorkScore | The number of trailing zeroes required for the proof of work to be valid. Set to 0 to disable proof of work | uint   | 8             |
+| Name                                    | Description                                                                              | Type   | Default value |
+| --------------------------------------- | ---------------------------------------------------------------------------------------- | ------ | ------------- |
+| accountAddress                          | The address of the account that is used to issue the blocks                              | string | ""            |
+| accountSeed                             | The seed of the account that is used to generate the public keypair used to issue blocks | string | ""            |
+| [proofOfWork](#blockissuer_proofofwork) | Configuration for proofOfWork                                                            | object |               |
+
+### <a id="blockissuer_proofofwork"></a> ProofOfWork
+
+| Name                | Description                                                                                                 | Type | Default value |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- | ---- | ------------- |
+| targetTrailingZeros | The number of trailing zeroes required for the proof of work to be valid. Set to 0 to disable proof of work | uint | 25            |
 
 Example:
 
@@ -144,7 +150,9 @@ Example:
     "blockIssuer": {
       "accountAddress": "",
       "accountSeed": "",
-      "proofOfWorkScore": 8
+      "proofOfWork": {
+        "targetTrailingZeros": 25
+      }
     }
   }
 ```
