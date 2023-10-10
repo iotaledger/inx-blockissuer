@@ -30,7 +30,6 @@
   },
   "blockIssuer": {
     "accountAddress": "",
-    "accountSeed": "",
     "proofOfWork": {
       "targetTrailingZeros": 25
     }

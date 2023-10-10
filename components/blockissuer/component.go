@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -13,12 +14,12 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/app/shutdown"
+	"github.com/iotaledger/hive.go/crypto"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/inx-app/pkg/nodebridge"
 	"github.com/iotaledger/inx-blockissuer/pkg/daemon"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/hexutil"
 )
 
 const APIRoute = "/api/blockissuer/v1"
@@ -78,16 +79,25 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func() (ed25519.PrivateKey, error) {
-		if ParamsBlockIssuer.AccountSeed == "" {
-			return nil, ierrors.Errorf("empty seed in config")
-		}
-
-		seed, err := hexutil.DecodeHex(ParamsBlockIssuer.AccountSeed)
+		privateKeys, err := loadEd25519PrivateKeysFromEnvironment("BLOCKISSUER_PRV_KEY")
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "invalid seed: %s", ParamsBlockIssuer.AccountSeed)
+			return nil, ierrors.Errorf("loading block issuer private key failed, err: %w", err)
 		}
 
-		return ed25519.NewKeyFromSeed(seed), nil
+		if len(privateKeys) == 0 {
+			return nil, ierrors.New("loading block issuer private key failed, err: no private keys given")
+		}
+
+		if len(privateKeys) > 1 {
+			return nil, ierrors.New("loading block issuer private key failed, err: too many private keys given")
+		}
+
+		privateKey := privateKeys[0]
+		if len(privateKey) != ed25519.PrivateKeySize {
+			return nil, ierrors.New("loading block issuer private key failed, err: wrong private key length")
+		}
+
+		return privateKey, nil
 	}); err != nil {
 		return err
 	}
@@ -154,4 +164,29 @@ func run() error {
 	}
 
 	return nil
+}
+
+// loadEd25519PrivateKeysFromEnvironment loads ed25519 private keys from the given environment variable.
+func loadEd25519PrivateKeysFromEnvironment(name string) ([]ed25519.PrivateKey, error) {
+	keys, exists := os.LookupEnv(name)
+	if !exists {
+		return nil, ierrors.Errorf("environment variable '%s' not set", name)
+	}
+
+	if len(keys) == 0 {
+		return nil, ierrors.Errorf("environment variable '%s' not set", name)
+	}
+
+	privateKeysSplitted := strings.Split(keys, ",")
+	privateKeys := make([]ed25519.PrivateKey, len(privateKeysSplitted))
+	for i, key := range privateKeysSplitted {
+		privateKey, err := crypto.ParseEd25519PrivateKeyFromString(key)
+		if err != nil {
+			return nil, ierrors.Errorf("environment variable '%s' contains an invalid private key '%s'", name, key)
+
+		}
+		privateKeys[i] = privateKey
+	}
+
+	return privateKeys, nil
 }

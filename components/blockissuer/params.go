@@ -4,7 +4,6 @@ import "github.com/iotaledger/hive.go/app"
 
 type ParametersBlockIssuer struct {
 	AccountAddress string `default:"" usage:"the address of the account that is used to issue the blocks"`
-	AccountSeed    string `default:"" usage:"the seed of the account that is used to generate the public keypair used to issue blocks"`
 
 	ProofOfWork struct {
 		TargetTrailingZeros uint8 `default:"25" usage:"the number of trailing zeroes required for the proof of work to be valid. Set to 0 to disable proof of work"`
