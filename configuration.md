@@ -131,11 +131,10 @@ Example:
 
 ## <a id="blockissuer"></a> 4. BlockIssuer
 
-| Name                                    | Description                                                                              | Type   | Default value |
-| --------------------------------------- | ---------------------------------------------------------------------------------------- | ------ | ------------- |
-| accountAddress                          | The address of the account that is used to issue the blocks                              | string | ""            |
-| accountSeed                             | The seed of the account that is used to generate the public keypair used to issue blocks | string | ""            |
-| [proofOfWork](#blockissuer_proofofwork) | Configuration for proofOfWork                                                            | object |               |
+| Name                                    | Description                                                 | Type   | Default value |
+| --------------------------------------- | ----------------------------------------------------------- | ------ | ------------- |
+| accountAddress                          | The address of the account that is used to issue the blocks | string | ""            |
+| [proofOfWork](#blockissuer_proofofwork) | Configuration for proofOfWork                               | object |               |
 
 ### <a id="blockissuer_proofofwork"></a> ProofOfWork
 
@@ -149,7 +148,6 @@ Example:
   {
     "blockIssuer": {
       "accountAddress": "",
-      "accountSeed": "",
       "proofOfWork": {
         "targetTrailingZeros": 25
       }

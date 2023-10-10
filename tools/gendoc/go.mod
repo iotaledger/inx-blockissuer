@@ -34,19 +34,19 @@ require (
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
-	github.com/iotaledger/hive.go/constraints v0.0.0-20230926103137-8f457ed70521 // indirect
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230921132212-c286a9bd46ea // indirect
-	github.com/iotaledger/hive.go/crypto v0.0.0-20230921132212-c286a9bd46ea // indirect
+	github.com/iotaledger/hive.go/constraints v0.0.0-20230929122509-67f34bfed40d // indirect
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230929122509-67f34bfed40d // indirect
+	github.com/iotaledger/hive.go/crypto v0.0.0-20230929122509-67f34bfed40d // indirect
 	github.com/iotaledger/hive.go/ds v0.0.0-20230912172434-dc477e1f5140 // indirect
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20230925074643-a89732593ca8 // indirect
-	github.com/iotaledger/hive.go/lo v0.0.0-20230921132212-c286a9bd46ea // indirect
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20230929122509-67f34bfed40d // indirect
+	github.com/iotaledger/hive.go/lo v0.0.0-20230929122509-67f34bfed40d // indirect
 	github.com/iotaledger/hive.go/logger v0.0.0-20230912172434-dc477e1f5140 // indirect
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230921132212-c286a9bd46ea // indirect
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230926122307-d671b36a4a65 // indirect
-	github.com/iotaledger/hive.go/stringify v0.0.0-20230921132212-c286a9bd46ea // indirect
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230927140518-622f63be6182 // indirect
-	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230927140257-bfa0bb0af2bd // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230929111131-d91da146ee57 // indirect
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230929122509-67f34bfed40d // indirect
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230929122509-67f34bfed40d // indirect
+	github.com/iotaledger/hive.go/stringify v0.0.0-20230929122509-67f34bfed40d // indirect
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231001095511-32be422a567e // indirect
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231001095356-923e8f138951 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231004090046-91d32e8d62b8 // indirect
 	github.com/knadh/koanf v1.5.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/labstack/echo/v4 v4.11.1 // indirect

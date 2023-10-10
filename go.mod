@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	github.com/iotaledger/hive.go/app v0.0.0-20230912172434-dc477e1f5140
+	github.com/iotaledger/hive.go/crypto v0.0.0-20230929122509-67f34bfed40d
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20230929122509-67f34bfed40d
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230929122509-67f34bfed40d
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231001095511-32be422a567e
@@ -39,7 +40,6 @@ require (
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230929122509-67f34bfed40d // indirect
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230929122509-67f34bfed40d // indirect
-	github.com/iotaledger/hive.go/crypto v0.0.0-20230929122509-67f34bfed40d // indirect
 	github.com/iotaledger/hive.go/ds v0.0.0-20230912172434-dc477e1f5140 // indirect
 	github.com/iotaledger/hive.go/lo v0.0.0-20230929122509-67f34bfed40d // indirect
 	github.com/iotaledger/hive.go/logger v0.0.0-20230912172434-dc477e1f5140 // indirect
