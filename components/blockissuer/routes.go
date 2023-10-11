@@ -23,8 +23,9 @@ const (
 )
 
 func registerRoutes() {
-	deps.Echo.GET("/info", getInfo)
-	deps.Echo.POST("/issue", sendPayload)
+	echoGroup := deps.Echo.Group(APIRoute)
+	echoGroup.GET("/info", getInfo)
+	echoGroup.POST("/issue", sendPayload)
 }
 
 func getInfo(c echo.Context) error {
