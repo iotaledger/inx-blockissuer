@@ -65,7 +65,7 @@ func getRequestCommitmentID(c echo.Context) (iotago.CommitmentID, error) {
 		return iotago.EmptyCommitmentID, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, commitment ID is missing in the header %s", HeaderBlockIssuerCommitmentID)
 	}
 
-	commitmentID, err := iotago.SlotIdentifierFromHexString(commitmentIDHex)
+	commitmentID, err := iotago.CommitmentIDFromHexString(commitmentIDHex)
 	if err != nil {
 		return iotago.EmptyCommitmentID, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, invalid commitment ID value in the header %s, error: %w", HeaderBlockIssuerCommitmentID, err)
 	}
@@ -80,7 +80,7 @@ func getPayload(c echo.Context, requiresProofOfWork bool) (iotago.BlockPayload, 
 		return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
 	}
 
-	var iotaPayload iotago.Payload
+	var iotaPayload iotago.BlockPayload
 
 	if c.Request().Body == nil {
 		// bad request
@@ -96,7 +96,7 @@ func getPayload(c echo.Context, requiresProofOfWork bool) (iotago.BlockPayload, 
 	var payloadBytes []byte
 	switch mimeType {
 	case echo.MIMEApplicationJSON:
-		if err := deps.NodeBridge.APIProvider().CurrentAPI().JSONDecode(bytes, iotaPayload, serix.WithValidation()); err != nil {
+		if err := deps.NodeBridge.APIProvider().CurrentAPI().JSONDecode(bytes, &iotaPayload, serix.WithValidation()); err != nil {
 			return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
 		}
 
@@ -109,7 +109,7 @@ func getPayload(c echo.Context, requiresProofOfWork bool) (iotago.BlockPayload, 
 		}
 
 	case httpserver.MIMEApplicationVendorIOTASerializerV2:
-		if _, err := deps.NodeBridge.APIProvider().CurrentAPI().Decode(bytes, iotaPayload, serix.WithValidation()); err != nil {
+		if _, err := deps.NodeBridge.APIProvider().CurrentAPI().Decode(bytes, &iotaPayload, serix.WithValidation()); err != nil {
 			return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
 		}
 		// No need to encode the payload again, we already have the bytes
