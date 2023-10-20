@@ -64,7 +64,7 @@ func provide(c *dig.Container) error {
 			return nil, ierrors.Wrapf(err, "invalid bech32 address: %s", ParamsBlockIssuer.AccountAddress)
 		}
 
-		if deps.NodeBridge.APIProvider().CurrentAPI().ProtocolParameters().Bech32HRP() != hrp {
+		if deps.NodeBridge.APIProvider().CommittedAPI().ProtocolParameters().Bech32HRP() != hrp {
 			return nil, ierrors.Wrapf(err, "invalid bech32 address prefix: %s", hrp)
 		}
 
