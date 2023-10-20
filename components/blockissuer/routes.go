@@ -96,20 +96,20 @@ func getPayload(c echo.Context, requiresProofOfWork bool) (iotago.BlockPayload, 
 	var payloadBytes []byte
 	switch mimeType {
 	case echo.MIMEApplicationJSON:
-		if err := deps.NodeBridge.APIProvider().CurrentAPI().JSONDecode(bytes, &iotaPayload, serix.WithValidation()); err != nil {
+		if err := deps.NodeBridge.APIProvider().CommittedAPI().JSONDecode(bytes, &iotaPayload, serix.WithValidation()); err != nil {
 			return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
 		}
 
 		if requiresProofOfWork {
 			// Serialize the payload so that we can verify the PoW
-			payloadBytes, err = deps.NodeBridge.APIProvider().CurrentAPI().Encode(iotaPayload)
+			payloadBytes, err = deps.NodeBridge.APIProvider().CommittedAPI().Encode(iotaPayload)
 			if err != nil {
 				return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
 			}
 		}
 
 	case httpserver.MIMEApplicationVendorIOTASerializerV2:
-		if _, err := deps.NodeBridge.APIProvider().CurrentAPI().Decode(bytes, &iotaPayload, serix.WithValidation()); err != nil {
+		if _, err := deps.NodeBridge.APIProvider().CommittedAPI().Decode(bytes, &iotaPayload, serix.WithValidation()); err != nil {
 			return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
 		}
 		// No need to encode the payload again, we already have the bytes
@@ -164,7 +164,7 @@ func constructBlock(c echo.Context, signedTx *iotago.SignedTransaction, allotedM
 	}
 
 	// Construct Block
-	blockBuilder := builder.NewBasicBlockBuilder(deps.NodeBridge.APIProvider().CurrentAPI())
+	blockBuilder := builder.NewBasicBlockBuilder(deps.NodeBridge.APIProvider().CommittedAPI())
 
 	// we need to set the commitmentID to the one the payload signer used, otherwise the RMC could be different,
 	// and therefore the allotment could be wrong, which causes the block to fail.
@@ -248,7 +248,7 @@ func sendPayload(c echo.Context) error {
 	}
 
 	// encode the response
-	jsonResult, err := deps.NodeBridge.APIProvider().CurrentAPI().JSONEncode(&apimodels.BlockCreatedResponse{BlockID: blockID})
+	jsonResult, err := deps.NodeBridge.APIProvider().CommittedAPI().JSONEncode(&apimodels.BlockCreatedResponse{BlockID: blockID})
 	if err != nil {
 		return ierrors.Wrapf(echo.ErrInternalServerError, "failed to encode the response: %w", err)
 	}
