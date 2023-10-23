@@ -1,8 +1,6 @@
 package blockissuer
 
 import (
-	"io"
-	"net/http"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
@@ -29,7 +27,7 @@ func registerRoutes() {
 }
 
 func getInfo(c echo.Context) error {
-	return c.JSON(http.StatusOK, &BlockIssuerInfo{
+	return httpserver.SendResponseByHeader(c, deps.NodeBridge.APIProvider().CommittedAPI(), &apimodels.BlockIssuerInfo{
 		BlockIssuerAddress:     ParamsBlockIssuer.AccountAddress,
 		PowTargetTrailingZeros: ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros,
 	})
@@ -74,49 +72,29 @@ func getRequestCommitmentID(c echo.Context) (iotago.CommitmentID, error) {
 }
 
 func getPayload(c echo.Context, requiresProofOfWork bool) (iotago.BlockPayload, []byte, error) {
-
-	mimeType, err := httpserver.GetRequestContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV2, echo.MIMEApplicationJSON)
-	if err != nil {
-		return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
-	}
-
-	var iotaPayload iotago.BlockPayload
-
-	if c.Request().Body == nil {
-		// bad request
-		return nil, nil, ierrors.Wrap(httpserver.ErrInvalidParameter, "invalid payload, error: request body missing")
-	}
-
-	bytes, err := io.ReadAll(c.Request().Body)
-	if err != nil {
-		return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
-	}
-
-	// Check if we got a JSON payload or a binary payload
 	var payloadBytes []byte
-	switch mimeType {
-	case echo.MIMEApplicationJSON:
-		if err := deps.NodeBridge.APIProvider().CommittedAPI().JSONDecode(bytes, &iotaPayload, serix.WithValidation()); err != nil {
-			return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
+	iotaPayload, err := httpserver.ParseRequestByHeader(c, deps.NodeBridge.APIProvider().CommittedAPI(), func(bytes []byte) (iotago.BlockPayload, int, error) {
+		var iotaPayload iotago.BlockPayload
+		consumed, err := deps.NodeBridge.APIProvider().CommittedAPI().Decode(bytes, &iotaPayload, serix.WithValidation())
+		if err != nil {
+			return nil, consumed, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
 		}
 
-		if requiresProofOfWork {
-			// Serialize the payload so that we can verify the PoW
-			payloadBytes, err = deps.NodeBridge.APIProvider().CommittedAPI().Encode(iotaPayload)
-			if err != nil {
-				return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
-			}
-		}
-
-	case httpserver.MIMEApplicationVendorIOTASerializerV2:
-		if _, err := deps.NodeBridge.APIProvider().CommittedAPI().Decode(bytes, &iotaPayload, serix.WithValidation()); err != nil {
-			return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
-		}
 		// No need to encode the payload again, we already have the bytes
 		payloadBytes = bytes
 
-	default:
-		return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", echo.ErrUnsupportedMediaType)
+		return iotaPayload, consumed, nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if requiresProofOfWork && len(payloadBytes) == 0 {
+		// Serialize the payload so that we can verify the PoW
+		payloadBytes, err = deps.NodeBridge.APIProvider().CommittedAPI().Encode(iotaPayload)
+		if err != nil {
+			return nil, nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
+		}
 	}
 
 	return iotaPayload, payloadBytes, nil
@@ -247,11 +225,6 @@ func sendPayload(c echo.Context) error {
 		return ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to attach block: %w", err)
 	}
 
-	// encode the response
-	jsonResult, err := deps.NodeBridge.APIProvider().CommittedAPI().JSONEncode(&apimodels.BlockCreatedResponse{BlockID: blockID})
-	if err != nil {
-		return ierrors.Wrapf(echo.ErrInternalServerError, "failed to encode the response: %w", err)
-	}
-
-	return c.JSONBlob(http.StatusOK, jsonResult)
+	// send the response
+	return httpserver.SendResponseByHeader(c, deps.NodeBridge.APIProvider().CommittedAPI(), &apimodels.BlockCreatedResponse{BlockID: blockID})
 }
