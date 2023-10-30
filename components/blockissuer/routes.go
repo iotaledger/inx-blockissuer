@@ -71,10 +71,10 @@ func getRequestCommitmentID(c echo.Context) (iotago.CommitmentID, error) {
 	return commitmentID, nil
 }
 
-func getPayload(c echo.Context, requiresProofOfWork bool) (iotago.BlockPayload, []byte, error) {
+func getPayload(c echo.Context, requiresProofOfWork bool) (iotago.ApplicationPayload, []byte, error) {
 	var payloadBytes []byte
-	iotaPayload, err := httpserver.ParseRequestByHeader(c, deps.NodeBridge.APIProvider().CommittedAPI(), func(bytes []byte) (iotago.BlockPayload, int, error) {
-		var iotaPayload iotago.BlockPayload
+	iotaPayload, err := httpserver.ParseRequestByHeader(c, deps.NodeBridge.APIProvider().CommittedAPI(), func(bytes []byte) (iotago.ApplicationPayload, int, error) {
+		var iotaPayload iotago.ApplicationPayload
 		consumed, err := deps.NodeBridge.APIProvider().CommittedAPI().Decode(bytes, &iotaPayload, serix.WithValidation())
 		if err != nil {
 			return nil, consumed, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid payload, error: %w", err)
@@ -105,7 +105,7 @@ func getAllotedMana(signedTx *iotago.SignedTransaction) (iotago.Mana, error) {
 	var allotedMana iotago.Mana
 	for _, allotment := range signedTx.Transaction.Allotments {
 		if allotment.AccountID.Matches(deps.AccountAddress.AccountID()) {
-			allotedMana = allotment.Value
+			allotedMana = allotment.Mana
 			break
 		}
 	}
@@ -134,7 +134,7 @@ func validatePayload(c echo.Context, signedTx *iotago.SignedTransaction) error {
 	return nil
 }
 
-func constructBlock(c echo.Context, signedTx *iotago.SignedTransaction, allotedMana iotago.Mana, commitmentID iotago.CommitmentID) (*iotago.ProtocolBlock, error) {
+func constructBlock(c echo.Context, signedTx *iotago.SignedTransaction, allotedMana iotago.Mana, commitmentID iotago.CommitmentID) (*iotago.Block, error) {
 	// Request tips
 	strong, weak, shallowLike, err := deps.NodeBridge.RequestTips(c.Request().Context(), iotago.BlockMaxParents)
 	if err != nil {
