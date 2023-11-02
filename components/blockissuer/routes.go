@@ -136,7 +136,7 @@ func validatePayload(c echo.Context, signedTx *iotago.SignedTransaction) error {
 
 func constructBlock(c echo.Context, signedTx *iotago.SignedTransaction, allotedMana iotago.Mana, commitmentID iotago.CommitmentID) (*iotago.Block, error) {
 	// Request tips
-	strong, weak, shallowLike, err := deps.NodeBridge.RequestTips(c.Request().Context(), iotago.BlockMaxParents)
+	strong, weak, shallowLike, err := deps.NodeBridge.RequestTips(c.Request().Context(), iotago.BasicBlockMaxParents)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to request tips: %w", err)
 	}
