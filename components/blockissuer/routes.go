@@ -147,7 +147,7 @@ func constructBlock(c echo.Context, signedTx *iotago.SignedTransaction, allotedM
 	// we need to set the commitmentID to the one the payload signer used, otherwise the RMC could be different,
 	// and therefore the allotment could be wrong, which causes the block to fail.
 	blockBuilder.SlotCommitmentID(commitmentID)
-	blockBuilder.LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitmentID().Slot())
+	blockBuilder.LatestFinalizedSlot(deps.NodeBridge.LatestFinalizedCommitment().Commitment.Slot)
 	blockBuilder.StrongParents(strong)
 	blockBuilder.WeakParents(weak)
 	blockBuilder.ShallowLikeParents(shallowLike)
