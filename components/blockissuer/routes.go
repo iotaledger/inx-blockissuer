@@ -10,9 +10,9 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	inx "github.com/iotaledger/inx/go"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/blockissuer/pow"
 	"github.com/iotaledger/iota.go/v4/builder"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 const (
@@ -22,12 +22,12 @@ const (
 
 func registerRoutes() {
 	echoGroup := deps.Echo.Group(APIRoute)
-	echoGroup.GET("/info", getInfo)
-	echoGroup.POST("/issue", sendPayload)
+	echoGroup.GET(api.BlockIssuerEndpointInfo, getInfo)
+	echoGroup.POST(api.BlockIssuerEndpointIssuePayload, sendPayload)
 }
 
 func getInfo(c echo.Context) error {
-	return httpserver.SendResponseByHeader(c, deps.NodeBridge.APIProvider().CommittedAPI(), &apimodels.BlockIssuerInfo{
+	return httpserver.SendResponseByHeader(c, deps.NodeBridge.APIProvider().CommittedAPI(), &api.BlockIssuerInfo{
 		BlockIssuerAddress:     ParamsBlockIssuer.AccountAddress,
 		PowTargetTrailingZeros: ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros,
 	})
@@ -226,5 +226,5 @@ func sendPayload(c echo.Context) error {
 	}
 
 	// send the response
-	return httpserver.SendResponseByHeader(c, deps.NodeBridge.APIProvider().CommittedAPI(), &apimodels.BlockCreatedResponse{BlockID: blockID})
+	return httpserver.SendResponseByHeader(c, deps.NodeBridge.APIProvider().CommittedAPI(), &api.BlockCreatedResponse{BlockID: blockID})
 }
