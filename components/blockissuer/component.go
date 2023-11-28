@@ -36,7 +36,7 @@ func init() {
 
 type dependencies struct {
 	dig.In
-	NodeBridge      *nodebridge.NodeBridge
+	NodeBridge      nodebridge.NodeBridge
 	AccountAddress  *iotago.AccountAddress
 	PrivateKey      ed25519.PrivateKey
 	ShutdownHandler *shutdown.ShutdownHandler
@@ -51,7 +51,7 @@ var (
 func provide(c *dig.Container) error {
 	type depsIn struct {
 		dig.In
-		NodeBridge *nodebridge.NodeBridge
+		NodeBridge nodebridge.NodeBridge
 	}
 
 	if err := c.Provide(func(deps depsIn) (*iotago.AccountAddress, error) {
