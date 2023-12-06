@@ -13,7 +13,7 @@ var (
 	Name = "inx-blockissuer"
 
 	// Version of the app.
-	Version = "1.0.0-alpha.12"
+	Version = "1.0.0-alpha.13"
 )
 
 func App() *app.App {
