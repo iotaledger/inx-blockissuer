@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"errors"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/inx-app/pkg/nodebridge"
+	"github.com/iotaledger/inx-blockissuer/pkg/blockissuer"
 	"github.com/iotaledger/inx-blockissuer/pkg/daemon"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -116,7 +118,19 @@ func run() error {
 	if err := Component.Daemon().BackgroundWorker("API", func(ctx context.Context) {
 		Component.LogInfo("Starting API server ...")
 
-		registerRoutes()
+		_ = blockissuer.NewBlockIssuerServer(
+			deps.Echo.Group(APIRoute),
+			deps.NodeBridge,
+			deps.AccountAddress,
+			deps.PrivateKey,
+			ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros,
+		)
+
+		deps.Echo.Server.BaseContext = func(l net.Listener) context.Context {
+			// set BaseContext to be the same as the worker,
+			// so that requests being processed don't hang the shutdown procedure
+			return ctx
+		}
 
 		go func() {
 			Component.LogInfof("You can now access the API using: http://%s", ParamsRestAPI.BindAddress)
