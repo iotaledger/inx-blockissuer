@@ -118,13 +118,16 @@ func run() error {
 	if err := Component.Daemon().BackgroundWorker("API", func(ctx context.Context) {
 		Component.LogInfo("Starting API server ...")
 
-		_ = blockissuer.NewBlockIssuerServer(
+		_, err := blockissuer.NewBlockIssuerServer(
 			deps.Echo.Group(APIRoute),
 			deps.NodeBridge,
 			deps.AccountAddress,
 			deps.PrivateKey,
 			ParamsBlockIssuer.ProofOfWork.TargetTrailingZeros,
 		)
+		if err != nil {
+			Component.LogFatalf("failed to create block issuer server: %s", err)
+		}
 
 		deps.Echo.Server.BaseContext = func(l net.Listener) context.Context {
 			// set BaseContext to be the same as the worker,

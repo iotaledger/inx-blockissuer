@@ -2,6 +2,7 @@ package blockissuer
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -134,22 +135,28 @@ func (s *BlockIssuerServer) validatePayload(c echo.Context, signedTx *iotago.Sig
 }
 
 func (s *BlockIssuerServer) constructBlock(c echo.Context, signedTx *iotago.SignedTransaction, allotedMana iotago.Mana, commitmentID iotago.CommitmentID) (*iotago.Block, error) {
-	// Request tips
-	strong, weak, shallowLike, err := s.nodeBridge.RequestTips(c.Request().Context(), iotago.BasicBlockMaxParents)
+	// get latest information for block issuance from the node
+	blockIssuanceResponse, err := s.nodeClient.BlockIssuance(c.Request().Context())
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to request tips: %w", err)
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to request block issuance: %w", err)
+	}
+
+	// the issuing time of the blocks need to be monotonically increasing
+	issuingTime := time.Now().UTC()
+	if blockIssuanceResponse.LatestParentBlockIssuingTime.After(issuingTime) {
+		issuingTime = blockIssuanceResponse.LatestParentBlockIssuingTime.Add(time.Nanosecond)
 	}
 
 	// Construct Block
 	blockBuilder := builder.NewBasicBlockBuilder(s.nodeBridge.APIProvider().CommittedAPI())
-
+	blockBuilder.IssuingTime(issuingTime)
 	// we need to set the commitmentID to the one the payload signer used, otherwise the RMC could be different,
 	// and therefore the allotment could be wrong, which causes the block to fail.
 	blockBuilder.SlotCommitmentID(commitmentID)
-	blockBuilder.LatestFinalizedSlot(s.nodeBridge.LatestFinalizedCommitment().Commitment.Slot)
-	blockBuilder.StrongParents(strong)
-	blockBuilder.WeakParents(weak)
-	blockBuilder.ShallowLikeParents(shallowLike)
+	blockBuilder.LatestFinalizedSlot(blockIssuanceResponse.LatestFinalizedSlot)
+	blockBuilder.StrongParents(blockIssuanceResponse.StrongParents)
+	blockBuilder.WeakParents(blockIssuanceResponse.WeakParents)
+	blockBuilder.ShallowLikeParents(blockIssuanceResponse.ShallowLikeParents)
 	blockBuilder.Payload(signedTx)
 	// set the max burned mana to the mana that was alloted to the block issuer.
 	// if the value would be too low, the block would be filtered by the node of the block issuer.
