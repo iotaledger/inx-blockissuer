@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
+//nolint:revive // better to be explicit here
 type BlockIssuerServer struct {
 	nodeBridge             nodebridge.NodeBridge
 	accountAddress         *iotago.AccountAddress

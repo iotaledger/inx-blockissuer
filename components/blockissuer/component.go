@@ -3,7 +3,6 @@ package blockissuer
 import (
 	"context"
 	"crypto/ed25519"
-	"errors"
 	"net"
 	"net/http"
 	"os"
@@ -129,7 +128,7 @@ func run() error {
 			Component.LogFatalf("failed to create block issuer server: %s", err)
 		}
 
-		deps.Echo.Server.BaseContext = func(l net.Listener) context.Context {
+		deps.Echo.Server.BaseContext = func(net.Listener) context.Context {
 			// set BaseContext to be the same as the worker,
 			// so that requests being processed don't hang the shutdown procedure
 			return ctx
@@ -137,7 +136,7 @@ func run() error {
 
 		go func() {
 			Component.LogInfof("You can now access the API using: http://%s", ParamsRestAPI.BindAddress)
-			if err := deps.Echo.Start(ParamsRestAPI.BindAddress); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			if err := deps.Echo.Start(ParamsRestAPI.BindAddress); err != nil && !ierrors.Is(err, http.ErrServerClosed) {
 				Component.LogFatalf("Stopped REST-API server due to an error (%s)", err)
 			}
 		}()
@@ -200,7 +199,6 @@ func loadEd25519PrivateKeysFromEnvironment(name string) ([]ed25519.PrivateKey, e
 		privateKey, err := crypto.ParseEd25519PrivateKeyFromString(key)
 		if err != nil {
 			return nil, ierrors.Errorf("environment variable '%s' contains an invalid private key '%s'", name, key)
-
 		}
 		privateKeys[i] = privateKey
 	}

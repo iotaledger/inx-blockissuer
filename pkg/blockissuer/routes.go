@@ -39,7 +39,7 @@ func (s *BlockIssuerServer) proofOfWorkTrailingZeroes(data []byte, nonce uint64)
 	h.Write(data)
 	powDigest := h.Sum(nil)
 
-	return pow.TrailingZeros(powDigest[:], nonce)
+	return pow.TrailingZeros(powDigest, nonce)
 }
 
 func (s *BlockIssuerServer) getRequestPoWNonce(c echo.Context) (uint64, error) {
